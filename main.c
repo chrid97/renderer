@@ -2,6 +2,29 @@
 #include <stdio.h>
 #include <webgpu/webgpu.h>
 
+#define SHADER_SOURCE(...) #__VA_ARGS__
+
+static const char *wgsl_triangle = SHADER_SOURCE(
+    // what goes into our shader
+    struct VertexIn {
+      @location(0) aPos : vec2<f32>, @location(1) aCol : vec3<f32>,
+    };
+
+    @vertex fn vs_main(@builtin(vertex_index) vertexIndex : u32)
+        ->@builtin(position) vec4f {
+          let pos = array(vec2f(0.0, 0.5),   // top center
+                          vec2f(-0.5, -0.5), // bottom left
+                          vec2f(0.5, -0.5)   // bottom right
+          );
+
+          return vec4f(pos[vertexIndex], 0.0, 1.0);
+        }
+
+    @fragment fn fs()
+        ->@location(0) vec4f { return vec4f(1.0, 0.0, 0.0, 1.0); }
+
+);
+
 int main() {
   printf("WebGPU headers loaded successfully!\n");
 
@@ -28,29 +51,19 @@ int main() {
   WGPUSwapChain swapchain = wgpuDeviceCreateSwapChain(device, surface, &scDesc);
   WGPUTextureView targetView = wgpuSwapChainGetCurrentTextureView(swapchain);
 
-  WGPURenderPassColorAttachment colorAttachment = {
-      .view = targetView,
-      .clearValue = (WGPUColor){0.1, 0.2, 0.3, 1.0},
-      .loadOp = WGPULoadOp_Clear,
-      .storeOp = WGPUStoreOp_Store,
-  };
+  WGPUShaderModuleWGSLDescriptor wgsl = {
+      .chain.sType = WGPUSType_ShaderModuleWGSLDescriptor, .code = ""};
 
-  WGPURenderPassDescriptor renderPassDesc = {
-      .colorAttachmentCount = 1,
-      .colorAttachments = &colorAttachment,
-  };
+  wgpuDeviceCreateShaderModule(device,
+                               &(WGPUShaderModuleDescriptor){
+                                   .nextInChain = (WGPUChainedStruct *)(&wgsl),
+                                   .label = "Hardcoded red triangle pipeline"});
 
-  WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, NULL);
-
-  WGPURenderPassEncoder pass =
-      wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
-  wgpuRenderPassEncoderEnd(pass);
-
-  WGPUCommandBuffer cmdBuf = wgpuCommandEncoderFinish(encoder, NULL);
-
-  wgpuQueueSubmit(queue, 1, &cmdBuf);
-
-  wgpuSwapChainPresent(swapchain);
+  // render
+  wgpuDeviceCreateCommandEncoder(
+      device, &(WGPUCommandEncoderDescriptor){.label = "Command Encoder"});
+  // WGPURenderPassEncoder
+  // submit encoder?
 
   printf("Frame rendered!\n");
 
